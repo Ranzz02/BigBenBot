@@ -1,0 +1,10 @@
+services:
+  bigben-bot:
+    build: .
+    container_name: bigben-bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./:/usr/src/app
+    command: "node bot.js"

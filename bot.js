@@ -1,90 +1,216 @@
-require('dotenv').config();
-const Discord = require('discord.js');
-const cron = require('node-cron');
+import Discord, { REST, Routes, GatewayIntentBits } from 'discord.js';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource } from '@discordjs/voice';
+import cron from 'node-cron';
+import dotenv from 'dotenv';
 
-const { TOKEN, VOICE_CHANNEL_ID, GUILD_ID, TEXT_CHANNEL_ID, MATCH_DINGS_WITH_HOUR } = process.env;
+dotenv.config();
 
-const Client = new Discord.Client();
+const rest = new REST().setToken(process.env.TOKEN);
+export const slashRegister = async () => {
+    try {
+        await rest.put(Routes.applicationGuildCommands(process.env.BOT_ID, process.env.GUILD_ID), {
+            body: [
+                {
+                    name: "test",
+                    description: "Test out the big man"
+                }
+            ]
+        });
+    } catch (error) {
+        console.log(error);
+    }
+};
 
-let guild, voiceChannel, textChannel ;
+slashRegister();
 
-// When bot comes online check the guild and voice channel are valid
-// if they are not found the program will exit
-Client.on('ready', async () => {
-	try {
-		guild = await Client.guilds.fetch(GUILD_ID);
-		voiceChannel = guild.channels.cache.get(VOICE_CHANNEL_ID);
-	} catch (error) {
-		console.log(error);
-		process.exit(1);
-	}
-	textChannel = guild.channels.cache.get(TEXT_CHANNEL_ID);
-	console.log('Big Ben Ready...');
-	Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
+const { TOKEN, GUILD_ID, VOICE_CHANNEL_ID, TEXT_CHANNEL_ID, MATCH_DINGS_WITH_HOUR } = process.env;
+
+const Client = new Discord.Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessageTyping
+    ]
 });
 
-// use node-cron to create a job to run every hour
-const task = cron.schedule('0 0 */1 * * *', async () => {
-	let { hour, amPm, timezoneOffsetString } = getTimeInfo();
+let guild, textChannel;
 
-	// if text channel was defined send message in chat
-	if (textChannel) {
-		const messageEmbed = new Discord.MessageEmbed()
-		.setColor('#FFD700')
-		.setTitle(`The time is now ${hour}:00 ${amPm} GMT${timezoneOffsetString}`)
-		
-		textChannel.send(messageEmbed);
-	}
+// When the bot comes online, check the guild and voice channel are valid
+Client.on('ready', async () => {
+    try {
+        guild = await Client.guilds.fetch(GUILD_ID);
+        textChannel = await guild.channels.fetch(TEXT_CHANNEL_ID);
+        Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
+        console.log('Big Ben Ready...');
+    } catch (error) {
+        console.log(error);
+        process.exit(1);
+    }
+});
 
-	// check if VC defined in config is empty
-	if (voiceChannel.members.size >= 1) {
-		try {
-			Client.user.setPresence({ activity: { name: 'the big bell', type: 'PLAYING' }, status: 'available' });
-			// connect to voice channel
-			const connection = await voiceChannel.join();
-			// counter for looping
-			let count = 1;
+// Listen for messages in the text channel
+Client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isCommand()) return; // Check if it's a command interaction
+
+    const { commandName } = interaction;
+
+    if (commandName === 'test') {
+        await interaction.deferReply(); // Acknowledge the command
+
+        // Get current hour and other time info
+        let { hour } = getTimeInfo();
+
+        try {
+            // Set bot presence to indicate testing
+            Client.user.setPresence({ activity: { name: 'the big bell (test)', type: 'PLAYING' }, status: 'available' });
+
+            // Connect to the voice channel
+            const connection = joinVoiceChannel({
+                channelId: VOICE_CHANNEL_ID,
+                guildId: interaction.guild.id, // Use interaction.guild.id instead of message.guild.id
+                adapterCreator: interaction.guild.voiceAdapterCreator,
+            });
+
+            // Create audio player
+            const player = createAudioPlayer();
+
+			// Immediately invoked function that loops to play the bell sound
+			(async function play() {
+				for (let i = 0; i < hour; i++) {
+					const resource = createAudioResource('bigben.mp3', {
+						inlineVolume: true // Allows volume manipulation, useful for error handling
+					});
+
+					player.play(resource); // Play the resource
+					connection.subscribe(player); // Subscribe the connection to the audio player
+					
+					// Log when a sound starts playing
+					console.log(`Playing sound ${i + 1} of ${hour}`);
+
+					// Wait for the audio to finish before playing the next one
+					await new Promise((resolve, reject) => {
+						player.once('idle', () => {
+							console.log(`Sound ${i + 1} finished playing`);
+							resolve();
+						});
 		
-			// immediately invoked function that loops to play the bell sound 
-			(function play(Client) {
-				connection.play('bigben.mp3')
-				.on('finish', () => {
-					count += 1;
-					if (count <= hour && MATCH_DINGS_WITH_HOUR == 'true') {
-						play(Client);
-					} else {
-						connection.disconnect();
-						Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
-					}
-				})
+						player.once('error', (error) => {
+							console.error(`Error while playing sound ${i + 1}:`, error);
+							reject(error); // Reject the promise if an error occurs
+						});
+					});
+				}
+		
+				// Disconnect after playing all chimes
+				connection.disconnect();
+				Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
 			})();
 
-		} catch(error) {
-			console.log(error);
-		}
-	}
+            await interaction.editReply(`Playing the bell sound ${hour} times.`); // Optional response to the user
+        } catch (error) {
+            console.error(error);
+            await interaction.editReply('An error occurred while trying to play the sound.'); // Notify user of error
+        }
+    } else if (commandName === 'help') {
+        const commands = [
+            { name: 'test', description: 'Test out the big man' },
+            // Add other commands here
+        ];
+
+        const helpEmbed = new Discord.EmbedBuilder()
+            .setColor('#FFD700')
+            .setTitle('Available Commands')
+            .setDescription('Here are the commands you can use:');
+
+        commands.forEach(cmd => {
+            helpEmbed.addFields({ name: `/${cmd.name}`, value: cmd.description });
+        });
+
+        await interaction.reply({ embeds: [helpEmbed] }); // Use reply with embeds
+    }
 });
 
-// function to get current time and return object containing
-// hour and if it is am or pm
+// Use node-cron to create a job to run every hour
+const task = cron.schedule('0 * * * *', async () => { // Adjusted to run at the top of every hour
+    let { hour, amPm, timezoneOffsetString } = getTimeInfo();
+
+    // If text channel was defined, send message in chat
+    if (textChannel) {
+        const messageEmbed = new Discord.EmbedBuilder()
+            .setColor('#FFD700')
+            .setTitle(`The time is now ${hour}:00 ${amPm} GMT${timezoneOffsetString}`);
+
+        textChannel.send({ embeds: [messageEmbed] }); // Send embed message
+    }
+
+    try {
+        Client.user.setPresence({ activity: { name: 'the big bell', type: 'PLAYING' }, status: 'available' });
+        
+		// Connect to the voice channel
+        const connection = joinVoiceChannel({
+            channelId: VOICE_CHANNEL_ID,
+            guildId: GUILD_ID,
+            adapterCreator: guild.voiceAdapterCreator,
+        });
+
+        // Create audio player
+        const player = createAudioPlayer();
+
+        // Immediately invoked function that loops to play the bell sound
+        (async function play() {
+			for (let i = 0; i < hour; i++) {
+				const resource = createAudioResource('bigben.mp3', {
+					inlineVolume: true // Allows volume manipulation, useful for error handling
+				});
+
+				player.play(resource); // Play the resource
+				connection.subscribe(player); // Subscribe the connection to the audio player
+				
+				// Log when a sound starts playing
+				console.log(`Playing sound ${i + 1} of ${hour}`);
+
+				// Wait for the audio to finish before playing the next one
+				await new Promise((resolve, reject) => {
+					player.once('idle', () => {
+						console.log(`Sound ${i + 1} finished playing`);
+						resolve();
+					});
+	
+					player.once('error', (error) => {
+						console.error(`Error while playing sound ${i + 1}:`, error);
+						reject(error); // Reject the promise if an error occurs
+					});
+				});
+			}
+	
+			// Disconnect after playing all chimes
+			connection.disconnect();
+			Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
+		})();
+    } catch (error) {
+        console.log(error);
+    }
+});
+
+// Function to get current time and return an object containing hour and AM/PM
 const getTimeInfo = () => {
-		let time = new Date();
-		let hour = time.getHours() >= 12 ? time.getHours() - 12 : time.getHours();
-		hour = hour === 0 ? 12 : hour;
-		let amPm = time.getHours() >= 12 ? 'PM' : 'AM';
-		// get gmt offset in minutes and convert to hours
-		let gmtOffset = time.getTimezoneOffset() / 60
-		// turn gmt offset into a string representing the timezone in its + or - gmt offset
-		let timezoneOffsetString = `${gmtOffset > 0 ? '-':'+'} ${Math.abs(gmtOffset)}`;
+    // Create a date in the desired time zone (here is UTC+2 or UTC+3)
+    const time = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Helsinki" }));
+    let hour = time.getHours() >= 12 ? time.getHours() - 12 : time.getHours();
+    hour = hour === 0 ? 12 : hour;
+    let amPm = time.getHours() >= 12 ? 'PM' : 'AM';
+    let gmtOffset = time.getTimezoneOffset() / 60;
+    let timezoneOffsetString = `${gmtOffset > 0 ? '-' : '+'} ${Math.abs(gmtOffset)}`;
 
-	return {
-		hour,
-		amPm,
-		timezoneOffsetString
-	}
-}
+    return {
+        hour,
+        amPm,
+        timezoneOffsetString
+    };
+};
 
-// start the cron job
+// Start the cron job
 task.start();
 
 Client.login(TOKEN);
