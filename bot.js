@@ -1,27 +1,20 @@
 import Discord, { REST, Routes, GatewayIntentBits } from 'discord.js';
 import { joinVoiceChannel, createAudioPlayer, createAudioResource } from '@discordjs/voice';
-import cron from 'node-cron';
+import { CronJob } from 'cron';
+import commands from "./commands.json" assert { type: "json" };
 import dotenv from 'dotenv';
-
 dotenv.config();
 
 const rest = new REST().setToken(process.env.TOKEN);
-export const slashRegister = async () => {
+(async function slashRegister() {
     try {
         await rest.put(Routes.applicationGuildCommands(process.env.BOT_ID, process.env.GUILD_ID), {
-            body: [
-                {
-                    name: "test",
-                    description: "Test out the big man"
-                }
-            ]
+            body: commands
         });
     } catch (error) {
         console.log(error);
     }
-};
-
-slashRegister();
+})();
 
 const { TOKEN, GUILD_ID, VOICE_CHANNEL_ID, TEXT_CHANNEL_ID, MATCH_DINGS_WITH_HOUR } = process.env;
 
@@ -41,7 +34,7 @@ Client.on('ready', async () => {
     try {
         guild = await Client.guilds.fetch(GUILD_ID);
         textChannel = await guild.channels.fetch(TEXT_CHANNEL_ID);
-        Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
+        Client.user.setPresence({ activity: { name: 'Biggest of Bens', type: 'WATCHING' }, status: 'available' });
         console.log('Big Ben Ready...');
     } catch (error) {
         console.log(error);
@@ -55,67 +48,81 @@ Client.on('interactionCreate', async (interaction) => {
 
     const { commandName } = interaction;
 
-    if (commandName === 'test') {
-        await interaction.deferReply(); // Acknowledge the command
-
-        // Get current hour and other time info
-        let { hour } = getTimeInfo();
-
+    if (commandName === 'dong') {
+        await interaction.deferReply();
         try {
-            // Set bot presence to indicate testing
-            Client.user.setPresence({ activity: { name: 'the big bell (test)', type: 'PLAYING' }, status: 'available' });
-
 			// Immediately invoked function that loops to play the bell sound
-			play(player, connection);
-
-            await interaction.editReply(`Playing the bell sound ${hour} times.`); // Optional response to the user
+			play(1);
+            await interaction.editReply(`DONG!`);
         } catch (error) {
             console.error(error);
             await interaction.editReply('An error occurred while trying to play the sound.'); // Notify user of error
         }
-    } else if (commandName === 'help') {
-        const commands = [
-            { name: 'test', description: 'Test out the big man' },
-            // Add other commands here
-        ];
+    }
+    
+    if (commandName === 'time') {
+        await interaction.deferReply();
+        try {
+            let { hour, amPm, timezoneOffsetString } = getTimeInfo();
+            // If text channel is defined, send a message indicating the time
+            if (!textChannel) {
+                play(1);
+                
+                await interaction.editReply(`The time is now ${hour}:00 ${amPm} GMT${timezoneOffsetString}`);
+                return
+            } else {
+                play(1);
 
-        const helpEmbed = new Discord.EmbedBuilder()
-            .setColor('#FFD700')
-            .setTitle('Available Commands')
-            .setDescription('Here are the commands you can use:');
+                const messageEmbed = new Discord.EmbedBuilder()
+                .setColor('#FFD700')
+                .setTitle(`The time is now ${hour}:00 ${amPm} GMT${timezoneOffsetString}`);
 
-        commands.forEach(cmd => {
-            helpEmbed.addFields({ name: `/${cmd.name}`, value: cmd.description });
-        });
+                // Immediately invoked function that loops to play the bell sound
+                await interaction.editReply({ embeds: [messageEmbed] });
+                return
+            }
+            await interaction.editReply(`The time is now ${hour}:00 ${amPm} GMT${timezoneOffsetString}`);
+        } catch (error) {
+            console.error(error);
+            await interaction.editReply('An error occurred while trying to play the sound.'); // Notify user of error
+        }
+    }
 
-        await interaction.reply({ embeds: [helpEmbed] }); // Use reply with embeds
+    if (commandName === "help") {
+        await interaction.deferReply();
+        try {
+            const commandList = commands.map(cmd => `- **/${cmd.name}**: ${cmd.description}`).join('\n');
+            await interaction.editReply(`Here are the available commands:\n${commandList}`);
+        } catch (error) {
+            console.error(error);
+            await interaction.editReply('An error occurred while fetching help information.');
+        }
     }
 });
 
 // Use node-cron to create a job to run every hour
-const task = cron.schedule('0 * * * *', async () => { // Adjusted to run at the top of every hour
+const job = new CronJob('0 * * * *', async () => { // Runs at the top and bottom of the hour
     let { hour, amPm, timezoneOffsetString } = getTimeInfo();
 
-    // If text channel was defined, send message in chat
+    // If text channel is defined, send a message indicating the time
     if (textChannel) {
         const messageEmbed = new Discord.EmbedBuilder()
             .setColor('#FFD700')
             .setTitle(`The time is now ${hour}:00 ${amPm} GMT${timezoneOffsetString}`);
-
-        textChannel.send({ embeds: [messageEmbed] }); // Send embed message
+        
+        textChannel.send({ embeds: [messageEmbed] });
     }
 
     try {
-        Client.user.setPresence({ activity: { name: 'the big bell', type: 'PLAYING' }, status: 'available' });
-        
-
-        // Immediately invoked function that loops to play the bell sound
-        play();
-
+        hour = MATCH_DINGS_WITH_HOUR ? hour : 1;
+        play(hour);
     } catch (error) {
         console.log(error);
     }
-});
+}, null, true, "Europe/Helsinki");
+job.start();
+
+Client.login(TOKEN);
 
 // Function to get current time and return an object containing hour and AM/PM
 const getTimeInfo = () => {
@@ -134,14 +141,8 @@ const getTimeInfo = () => {
     };
 };
 
-// Start the cron job
-task.start();
-
-Client.login(TOKEN);
-
-async function play() {
-    let { hour } = getTimeInfo();
-
+// Play sound function
+async function play(hour) {
     // Connect to the voice channel
     const connection = joinVoiceChannel({
         channelId: VOICE_CHANNEL_ID,
@@ -180,5 +181,4 @@ async function play() {
 
     // Disconnect after playing all chimes
     connection.disconnect();
-    Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
 }

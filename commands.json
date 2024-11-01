@@ -1,0 +1,14 @@
+[
+    {
+        "name": "dong",
+        "description": "Play a beutiful dong of the man"
+    },
+    {
+        "name": "help",
+        "description": "List all available commands"
+    },
+    {
+        "name": "time",
+        "description": "Displays the current time."
+    }
+]
