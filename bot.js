@@ -65,47 +65,8 @@ Client.on('interactionCreate', async (interaction) => {
             // Set bot presence to indicate testing
             Client.user.setPresence({ activity: { name: 'the big bell (test)', type: 'PLAYING' }, status: 'available' });
 
-            // Connect to the voice channel
-            const connection = joinVoiceChannel({
-                channelId: VOICE_CHANNEL_ID,
-                guildId: interaction.guild.id, // Use interaction.guild.id instead of message.guild.id
-                adapterCreator: interaction.guild.voiceAdapterCreator,
-            });
-
-            // Create audio player
-            const player = createAudioPlayer();
-
 			// Immediately invoked function that loops to play the bell sound
-			(async function play() {
-				for (let i = 0; i < hour; i++) {
-					const resource = createAudioResource('bigben.mp3', {
-						inlineVolume: true // Allows volume manipulation, useful for error handling
-					});
-
-					player.play(resource); // Play the resource
-					connection.subscribe(player); // Subscribe the connection to the audio player
-					
-					// Log when a sound starts playing
-					console.log(`Playing sound ${i + 1} of ${hour}`);
-
-					// Wait for the audio to finish before playing the next one
-					await new Promise((resolve, reject) => {
-						player.once('idle', () => {
-							console.log(`Sound ${i + 1} finished playing`);
-							resolve();
-						});
-		
-						player.once('error', (error) => {
-							console.error(`Error while playing sound ${i + 1}:`, error);
-							reject(error); // Reject the promise if an error occurs
-						});
-					});
-				}
-		
-				// Disconnect after playing all chimes
-				connection.disconnect();
-				Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
-			})();
+			play(player, connection);
 
             await interaction.editReply(`Playing the bell sound ${hour} times.`); // Optional response to the user
         } catch (error) {
@@ -147,47 +108,10 @@ const task = cron.schedule('0 * * * *', async () => { // Adjusted to run at the 
     try {
         Client.user.setPresence({ activity: { name: 'the big bell', type: 'PLAYING' }, status: 'available' });
         
-		// Connect to the voice channel
-        const connection = joinVoiceChannel({
-            channelId: VOICE_CHANNEL_ID,
-            guildId: GUILD_ID,
-            adapterCreator: guild.voiceAdapterCreator,
-        });
-
-        // Create audio player
-        const player = createAudioPlayer();
 
         // Immediately invoked function that loops to play the bell sound
-        (async function play() {
-			for (let i = 0; i < hour; i++) {
-				const resource = createAudioResource('bigben.mp3', {
-					inlineVolume: true // Allows volume manipulation, useful for error handling
-				});
+        play();
 
-				player.play(resource); // Play the resource
-				connection.subscribe(player); // Subscribe the connection to the audio player
-				
-				// Log when a sound starts playing
-				console.log(`Playing sound ${i + 1} of ${hour}`);
-
-				// Wait for the audio to finish before playing the next one
-				await new Promise((resolve, reject) => {
-					player.once('idle', () => {
-						console.log(`Sound ${i + 1} finished playing`);
-						resolve();
-					});
-	
-					player.once('error', (error) => {
-						console.error(`Error while playing sound ${i + 1}:`, error);
-						reject(error); // Reject the promise if an error occurs
-					});
-				});
-			}
-	
-			// Disconnect after playing all chimes
-			connection.disconnect();
-			Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
-		})();
     } catch (error) {
         console.log(error);
     }
@@ -214,3 +138,47 @@ const getTimeInfo = () => {
 task.start();
 
 Client.login(TOKEN);
+
+async function play() {
+    let { hour } = getTimeInfo();
+
+    // Connect to the voice channel
+    const connection = joinVoiceChannel({
+        channelId: VOICE_CHANNEL_ID,
+        guildId: GUILD_ID,
+        adapterCreator: guild.voiceAdapterCreator,
+    });
+
+    // Create audio player
+    const player = createAudioPlayer();
+
+    for (let i = 0; i < hour; i++) {
+        const resource = createAudioResource('bigben.mp3', {
+            inlineVolume: true // Allows volume manipulation, useful for error handling
+        });
+        resource.volume.setVolume(2);
+
+        player.play(resource); // Play the resource
+        connection.subscribe(player); // Subscribe the connection to the audio player
+        
+        // Log when a sound starts playing
+        console.log(`Playing sound ${i + 1} of ${hour}`);
+
+        // Wait for the audio to finish before playing the next one
+        await new Promise((resolve, reject) => {
+            player.once('idle', () => {
+                console.log(`Sound ${i + 1} finished playing`);
+                resolve();
+            });
+
+            player.once('error', (error) => {
+                console.error(`Error while playing sound ${i + 1}:`, error);
+                reject(error); // Reject the promise if an error occurs
+            });
+        });
+    }
+
+    // Disconnect after playing all chimes
+    connection.disconnect();
+    Client.user.setPresence({ activity: { name: 'the hour', type: 'WATCHING' }, status: 'idle' });
+}
