@@ -2,23 +2,18 @@
   "name": "bigbenbot",
   "version": "1.0.0",
   "description": "Funny discord bot to help you keep track of time.",
-  "main": "bot.js",
+  "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node bot.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/index.js"
   },
   "author": "aaronr5",
   "license": "MIT",
   "dependencies": {
-    "@discordjs/opus": "^0.9.0",
     "@discordjs/voice": "^0.17.0",
     "cron": "^3.1.8",
     "discord.js": "^14.16.3",
-    "dotenv": "^10.0.0",
-    "ffmpeg": "0.0.4",
-    "ffmpeg-static": "^4.4.0",
-    "opusscript": "^0.0.8",
+    "dotenv": "^16.4.5",
     "tweetnacl": "^1.0.3"
   }
 }
