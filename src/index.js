@@ -21,12 +21,12 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 // Load event and command handlers
 loadEvents(Client);
-loadCommands(Client, rest);
 
 // Start the hourly cron job
 Client.once('ready', async () => {
     const guild = await Client.guilds.fetch(process.env.GUILD_ID); // Fetch the guild by ID
-    startCronJob(Client, guild); // Pass the client and guild to the cron job
+    startCronJob(guild); // Pass the client and guild to the cron job
+    loadCommands(Client, rest);
     console.log('Bot is ready!');
 });
 

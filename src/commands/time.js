@@ -10,7 +10,7 @@ export default {
         await interaction.deferReply();
         try {
             const { hour, amPm, timezoneOffsetString } = getTimeInfo();
-            play(guild, 1, "bigben.mp3");
+            play(guild, 1, "bigben.mp3", 0.33);
 
             const messageEmbed = new Discord.EmbedBuilder()
                 .setColor('#FFD700')
