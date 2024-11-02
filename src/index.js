@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { loadEvents } from './handlers/eventHandler.js';
 import { loadCommands } from './handlers/commandHandler.js';
 import { startCronJob } from './cron/job.js';
+import { REST } from '@discordjs/rest';
 dotenv.config();
 
 const Client = new Discord.Client({
