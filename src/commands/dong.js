@@ -7,7 +7,7 @@ export default {
         const guild = interaction.guild;
         await interaction.deferReply();
         try {
-            play(guild, 1, "bigben.mp3");
+            play(guild, 1, "bigben.mp3", 0.33);
             await interaction.editReply(`DONG!`);
         } catch (error) {
             console.error(error);
