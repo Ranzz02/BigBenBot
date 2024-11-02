@@ -10,5 +10,9 @@
     {
         "name": "time",
         "description": "Displays the current time."
+    },
+    {
+        "name": "mega-dong",
+        "description": "You will see"
     }
 ]

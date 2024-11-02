@@ -59,6 +59,19 @@ Client.on('interactionCreate', async (interaction) => {
             await interaction.editReply('An error occurred while trying to play the sound.'); // Notify user of error
         }
     }
+
+    
+    if (commandName === 'mega-dong') {
+        await interaction.deferReply();
+        try {
+			// Immediately invoked function that loops to play the bell sound
+			play(1, 5);
+            await interaction.editReply(`MEGA DONG!!!`);
+        } catch (error) {
+            console.error(error);
+            await interaction.editReply('An error occurred while trying to play the sound.'); // Notify user of error
+        }
+    }
     
     if (commandName === 'time') {
         await interaction.deferReply();
@@ -142,7 +155,7 @@ const getTimeInfo = () => {
 };
 
 // Play sound function
-async function play(hour) {
+async function play(hour, volume=1) {
     // Connect to the voice channel
     const connection = joinVoiceChannel({
         channelId: VOICE_CHANNEL_ID,
@@ -157,7 +170,7 @@ async function play(hour) {
         const resource = createAudioResource('bigben.mp3', {
             inlineVolume: true // Allows volume manipulation, useful for error handling
         });
-        resource.volume.setVolume(2);
+        resource.volume.setVolume(volume);
 
         player.play(resource); // Play the resource
         connection.subscribe(player); // Subscribe the connection to the audio player
