@@ -16,10 +16,11 @@ const Client = new Discord.Client({
 });
 
 Client.commands = new Collection();
+const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 // Load event and command handlers
 loadEvents(Client);
-loadCommands(Client);
+loadCommands(Client, rest);
 
 // Start the hourly cron job
 Client.once('ready', async () => {
